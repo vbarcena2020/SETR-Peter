@@ -18,13 +18,13 @@
 *   Authors: Roberto Calvo-Palomino <roberto.calvo [at] urjc [dot] es>
 */
 
-// Subject: Sistemas Empotrados y de Tiempo Real
+// Subject: Sistemas Empotrados y de Tiempo RealSUDO
 // Universidad Rey Juan Carlos, Spain
 
 #include <WiFi.h>
 
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "wifieif2";
+const char* password = "Goox0sie_WZCGGh25680000";
 
 void initWiFi() {
 
