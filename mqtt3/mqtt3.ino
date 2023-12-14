@@ -24,7 +24,8 @@
 #define EAP_USERNAME "m.pancracio.2020@alumnos.urjc.es"    // Use your URJC email
 //SSID NAME
 const char* ssid = "eduroam"; // eduroam SSID
-
+volatile int state = 0;
+long time_init;
 
 //-----
 WiFiClient wifiClient;
@@ -36,25 +37,61 @@ int        port     = 21883;
 const char topic[]  = "/SETR/2023/4/";
 
 
-const long interval = 8000;
+const long interval = 5000;
 unsigned long previousMillis = 0;
 
 int count = 0;
 
-StaticJsonDocument<256> doc;
-
+StaticJsonDocument<256> docStart;
+StaticJsonDocument<256> docEnd;
+StaticJsonDocument<256> docObs;
+StaticJsonDocument<256> docLine;
+StaticJsonDocument<256> docPing;
 char out[128];
 
-void send_start_lap() {
-  doc["team_name"] = "Nocom-Pila";
-  doc["id"] = 4;
-  doc["action"] = "START_LAP";
+void set_start_lap() {
+  docStart["team_name"] = "Nocom-Pila";
+  docStart["id"] = 4;
+  docStart["action"] = "START_LAP";
 
-  int b =serializeJson(doc, out);
+  int b =serializeJson(docStart, out);
   Serial.print("bytes = ");
   Serial.println(b,DEC);
 }
 
+
+void set_end_lap(long end_time ) {
+  docEnd["team_name"] = "Nocom-Pila";
+  docEnd["id"] = 4;
+  docEnd["action"] = "END_LAP";
+  docEnd["time"] = end_time;
+
+  int b =serializeJson(docEnd, out);
+}
+
+void set_obs_json(int distance ) {
+  docEnd["team_name"] = "Nocom-Pila";
+  docEnd["id"] = 4;
+  docEnd["action"] = "OBSTACLE_DETECTED";
+  docEnd["distance"] = distance;
+
+  int b =serializeJson(docObs , out);
+}
+
+void set_line_json() {
+  docStart["team_name"] = "Nocom-Pila";
+  docStart["id"] = 4;
+  docStart["action"] = "LINE_LOST";
+
+  int b =serializeJson(docLine, out);
+}
+void set_ping_json() {
+  docStart["team_name"] = "Nocom-Pila";
+  docStart["id"] = 4;
+  docStart["action"] = "PING";
+
+  int b =serializeJson(docPing, out);
+}
 
 //-----
 void setup() {
@@ -95,37 +132,55 @@ void setup() {
   Serial.println("You're connected to the MQTT broker!");
   Serial.println();
   //-----------------------------
-  // doc["team_name"] = "Nocom-Pila";
-  // doc["id"] = 4;
-  // doc["action"] = "START_LAP";
-
-  // int b =serializeJson(doc, out);
-  // Serial.print("bytes = ");
-  // Serial.println(b,DEC);
-
+  set_start_lap();
 }
 
 void loop() {
-  yield();
+  //yield();
 
   mqttClient.poll();
-
   unsigned long currentMillis = millis();
+  if (state == 0) {
+    
 
-  if (currentMillis - previousMillis >= interval) {
-    // save the last time a message was sent
-    previousMillis = currentMillis;
+    if (currentMillis - previousMillis >= interval) {
+      // save the last time a message was sent
+      previousMillis = currentMillis;
 
-    Serial.print("Sending message to topic: ");
-    Serial.println(topic);
-    Serial.println(out);
+      Serial.print("Sending message to topic: ");
+      Serial.println(topic);
+      Serial.println(out);
 
+      // send message, the Print interface can be used to set the message contents
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
 
-    // send message, the Print interface can be used to set the message contents
-    mqttClient.beginMessage(topic);
-    mqttClient.print(out);
-    mqttClient.endMessage();
+      Serial.println();
+      time_init = millis();
+      state = 1;
+    }
+  }
 
-    Serial.println();
+  if(state == 1) {
+    
+    if (currentMillis - previousMillis >= interval) {
+
+      set_end_lap(millis() - time_init);
+
+      Serial.print("Sending message to topic: ");
+      Serial.println(topic);
+      Serial.println(out);
+
+      // send message, the Print interface can be used to set the message contents
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+
+      Serial.println();
+      
+      state = 2;
+
+    }
   }
 }
