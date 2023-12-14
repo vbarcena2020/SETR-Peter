@@ -27,14 +27,21 @@
 // PIN_Motor_PWMB: Analog output [0-255]. It provides speed.
 #define PIN_Motor_PWMB 6
 
-#define SPEED 50
-#define TURN_SPEED 20
+#define SPEED 120
+#define TURN_SPEED 60
+
+#define PERIODIC_MOVE 90   //MOVE
+#define PERIODIC_SENSE 70  //SENSE
+#define PERIODIC_DIST 90   //DIST
+
 
 CRGB leds[NUM_LEDS];
 
 volatile int ir_state = 1;
 volatile int last_ir_sense = 1;
-volatile int stop = 0;
+int stop = 0;
+long dist;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -47,7 +54,7 @@ void setup() {
 
 
   pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT_PULLUP); 
+  pinMode(ECHO_PIN, INPUT); 
 
   pinMode(PIN_Motor_STBY, OUTPUT);
 
@@ -62,10 +69,10 @@ void setup() {
 
 
   digitalWrite(PIN_Motor_STBY, HIGH);
-  xTaskCreate(sense_line, "Sense_Line", 200, NULL, 1, NULL);
-  xTaskCreate(sense_distance, "Sense_Distance", 100, NULL, 1, NULL);
-  xTaskCreate(movement, "Movement", 200, NULL, 1, NULL);
-  vTaskStartScheduler();
+  xTaskCreate(sense_line, "Sense_Line", 90, NULL, 2, NULL);
+  xTaskCreate(movement, "Movement", 70, NULL, 3, NULL);
+  xTaskCreate(sense_distance, "Sense_Distance", 90, NULL, 1, NULL);
+
 }
 
 uint32_t Color(uint8_t r, uint8_t g, uint8_t b)
@@ -73,117 +80,134 @@ uint32_t Color(uint8_t r, uint8_t g, uint8_t b)
   return (((uint32_t)r << 16) | ((uint32_t)g << 8) | b);
 }
 
-
-
-void forward() {
+void forward(int speed) {
   digitalWrite(PIN_Motor_AIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMA, SPEED);
+  analogWrite(PIN_Motor_PWMA, speed);
   digitalWrite(PIN_Motor_BIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMB, SPEED);
+  analogWrite(PIN_Motor_PWMB, speed);
 }
 
-void backward() {
+void backward(int speed) {
   digitalWrite(PIN_Motor_AIN_1, LOW);
-  analogWrite(PIN_Motor_PWMA, SPEED);
+  analogWrite(PIN_Motor_PWMA, speed);
   digitalWrite(PIN_Motor_BIN_1, LOW);
-  analogWrite(PIN_Motor_PWMB, SPEED);
+  analogWrite(PIN_Motor_PWMB, speed);
 }
 
-void turn_left() {
+void turn_left(int speed, int turn_speed) {
   digitalWrite(PIN_Motor_AIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMA, SPEED);
+  analogWrite(PIN_Motor_PWMA, speed);
   digitalWrite(PIN_Motor_BIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMB, TURN_SPEED);
+  analogWrite(PIN_Motor_PWMB, turn_speed);
 }
 
-void turn_right() {
+void turn_right(int speed, int turn_speed) {
   digitalWrite(PIN_Motor_AIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMA, TURN_SPEED);
+  analogWrite(PIN_Motor_PWMA, turn_speed);
   digitalWrite(PIN_Motor_BIN_1, HIGH);
-  analogWrite(PIN_Motor_PWMB, SPEED);
+  analogWrite(PIN_Motor_PWMB, speed);
 }
 
 void movement(void *pvParameters) {
-  for (;;) {
+  TickType_t xLastWakeTime, aux;
 
-  if (stop == 0) {
-    switch(ir_state) {
-      case 0:
-        turn_right();
-        break;
 
-      case 1:
-        forward();
-        break;
+  while (1) {
+    xLastWakeTime = xTaskGetTickCount();
+    aux = xLastWakeTime;
 
-      case 2:
-        turn_left();
-        break;
-      
-      case -1:
-        switch(last_ir_sense) {
-          case 0:
-            turn_right();
-            break;
+    if (stop == 0) {
+      switch(ir_state) {
+        case 0:
+          turn_right(SPEED, TURN_SPEED);
+          break;
 
-          case 1:
-            forward();
-            break;
+        case 1:
+          forward(SPEED);
+          break;
 
-          case 2:
-            turn_left();
-            break;
+        case 2:
+          turn_left(SPEED, TURN_SPEED);
+          break;
+        
+        case -1:
+          switch(last_ir_sense) {
+            case 0:
+              turn_right(SPEED, 5);
+              break;
 
-          default:
-            break;
-        }
-        break;
+            case 1:
+              forward(SPEED);
+              break;
 
-      default:
-        break;
+            case 2:
+              turn_left(SPEED, 5);
+              break;
+
+            default:
+              break;
+          }
+          break;
+
+        default:
+          break;
+      }
+    } else {
+      analogWrite(PIN_Motor_PWMA, 0);
+      analogWrite(PIN_Motor_PWMB, 0);
     }
-  } else {
-    analogWrite(PIN_Motor_PWMA, 0);
-    analogWrite(PIN_Motor_PWMB, 0);
-  }
+      
+    xTaskDelayUntil( &xLastWakeTime, ( PERIODIC_MOVE / portTICK_PERIOD_MS ) );
+
   }
 }
 
 void sense_distance(void *pvParameters) {
-  for (;;) {
+   TickType_t xLastWakeTime, aux;
 
-  long duration, dist;
-  digitalWrite(TRIG_PIN, LOW);  
-  delayMicroseconds(4);
-  digitalWrite(TRIG_PIN, HIGH);  
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  
-  duration = pulseIn(ECHO_PIN, HIGH);  
-  dist = duration * 10 / 292 / 2;
-  if (dist <= 8 && dist >= 5) {
-    stop = 1;
-  }
+
+  while (1) {
+    xLastWakeTime = xTaskGetTickCount();
+    aux = xLastWakeTime;
+    long duration;
+    digitalWrite(TRIG_PIN, LOW);  
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);  
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    
+    duration = pulseIn(ECHO_PIN, HIGH);  
+    dist = duration * 0.034 / 2; // Speed of sound in air is approximately 34 microseconds per centimeter
+    if (dist <= 8 && dist >= 5) {
+      stop = 1;
+    }
+
+      
+    xTaskDelayUntil( &xLastWakeTime, ( PERIODIC_DIST / portTICK_PERIOD_MS ) );
   }
 }
 
 
 void sense_line(void *pvParameters) {
-  for (;;) {
+  TickType_t xLastWakeTime, aux;
+
+  while (1) {
+    xLastWakeTime = xTaskGetTickCount();
+    aux = xLastWakeTime;
 
     int sensor_rigth = analogRead(PIN_ITR20001_RIGHT);
     int sensor_left = analogRead(PIN_ITR20001_LEFT);
     int sensor_middle = analogRead(PIN_ITR20001_MIDDLE);
 
-    if(sensor_rigth > 700 && sensor_rigth > sensor_left) {
+    if(sensor_rigth > 600 && sensor_rigth > sensor_left) {
       ir_state = 0;
       last_ir_sense = 0;
       FastLED.showColor(Color(0, 255, 0));
-    } else if(sensor_middle > 700 && sensor_middle > sensor_rigth && sensor_middle > sensor_left) {
+    } else if(sensor_middle > 600 && sensor_middle > sensor_rigth && sensor_middle > sensor_left) {
       ir_state = 1;
       last_ir_sense = 1;
       FastLED.showColor(Color(0, 255, 0));
-    } else if(sensor_left > 700 && sensor_left > sensor_rigth) {
+    } else if(sensor_left > 600 && sensor_left > sensor_rigth) {
       ir_state = 2;
       last_ir_sense = 2;
       FastLED.showColor(Color(0, 255, 0));
@@ -191,15 +215,10 @@ void sense_line(void *pvParameters) {
       ir_state = -1;
       FastLED.showColor(Color(255, 0, 0));
     }
-    // Serial.print("Left: ");
-    // Serial.print(sensor_left);
-    // Serial.print(" | ");
-    // Serial.print("Middle: ");
-    // Serial.print(sensor_middle);
-    // Serial.print(" | ");
-    // Serial.print("Rigth: ");
-    // Serial.println(sensor_rigth);  
-  
+      
+    xTaskDelayUntil( &xLastWakeTime, ( PERIODIC_SENSE / portTICK_PERIOD_MS ) );
+
+    
   }
   
     
@@ -207,14 +226,6 @@ void sense_line(void *pvParameters) {
 
 
 void loop() {
- 
-
-  // put your main code here, to run repeatedly:
-  //forward();
-  //turn_right();
-  //sense_line();
-  //backward();
-  //turn_left();
-  //digitalWrite(PIN_Motor_STBY, LOW);
 
 }
+
