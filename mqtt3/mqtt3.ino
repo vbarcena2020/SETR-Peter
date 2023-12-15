@@ -28,6 +28,7 @@ volatile int state = 0;
 long time_init;
 #define RXD2 33
 #define TXD2 4
+#define START 0
 String sendBuff;
 
 //-----
@@ -38,8 +39,6 @@ MqttClient mqttClient(wifiClient);
 const char broker[] = "193.147.53.2";
 int        port     = 21883;
 const char topic[]  = "/SETR/2023/4/";
-
-
 const long interval = 5000;
 unsigned long previousMillis = 0;
 
@@ -63,7 +62,7 @@ void set_start_lap() {
 }
 
 
-void set_end_lap(long end_time ) {
+void set_end_lap(String end_time ) {
   docEnd["team_name"] = "Nocom-Pila";
   docEnd["id"] = 4;
   docEnd["action"] = "END_LAP";
@@ -72,26 +71,27 @@ void set_end_lap(long end_time ) {
   int b =serializeJson(docEnd, out);
 }
 
-void set_obs_json(int distance ) {
-  docEnd["team_name"] = "Nocom-Pila";
-  docEnd["id"] = 4;
-  docEnd["action"] = "OBSTACLE_DETECTED";
-  docEnd["distance"] = distance;
+void set_obs_json(String distance ) {
+  docObs["team_name"] = "Nocom-Pila";
+  docObs["id"] = 4;
+  docObs["action"] = "OBSTACLE_DETECTED";
+  docObs["distance"] = distance;
 
   int b =serializeJson(docObs , out);
 }
 
 void set_line_json() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "LINE_LOST";
+  docLine["team_name"] = "Nocom-Pila";
+  docLine["id"] = 4;
+  docLine["action"] = "LINE_LOST";
 
   int b =serializeJson(docLine, out);
 }
-void set_ping_json() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "PING";
+void set_ping_json(String time) {
+  docPing["team_name"] = "Nocom-Pila";
+  docPing["id"] = 4;
+  docPing["action"] = "PING";
+  docPing["time"] = time ;
 
   int b =serializeJson(docPing, out);
 }
@@ -164,51 +164,58 @@ void loop() {
       time_init = millis();
       delay(5000);
       //Serial2.println('a');
-      Serial2.println("a");
-      Serial.println("a");
+      
+      Serial2.println("start");
+      Serial.println("start");
 
       state = 1;
     }
   }
-  // if (state == 1) {
+  if (state == 1) {
 
+    String s = Serial2.readString();
+    //String time = Serial2.readString();
 
-  //   if (Serial2.available()) {
-
-  //     char c = Serial2.read();
-  //     sendBuff += c;
+    int i = s.indexOf(' ');
+    int j = s.indexOf('\r');
+    String token = s.substring(0, i);
+    String parameter = s.substring(i+1, j);
+    //Serial.println(token);
+    //Serial.println(parameter);
+    //Serial.println(s);
+  
+    if(token == "ping") {
       
-  //     if (c == 'GO!')  {            
-  //       Serial.print("Received data in serial port from Arduino: ");
-  //       Serial.println(sendBuff);
-
-  //       sendBuff = "";
-  //     } 
-
-
-  //   }
-
-    
-  // }
-  if(state == 1) {
-    
-    if (currentMillis - previousMillis >= interval) {
-
-      set_end_lap(millis() - time_init);
-
-      Serial.print("Sending message to topic: ");
-      Serial.println(topic);
-      Serial.println(out);
-
-      // send message, the Print interface can be used to set the message contents
+      set_ping_json(parameter);
+      //Serial.println(parameter);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
-
-      Serial.println();
+    } else if(token == "lost") {
+      set_line_json();
+      //Serial.println(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
       
-      state = 3;
-
+    } else if(token == "dist") {
+      
+      set_obs_json(parameter);
+      //Serial.println(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }  else if (token == "stop") {
+      set_end_lap(parameter);
+      //Serial.println(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      state = 2;
+      
     }
+    
   }
+
 }
