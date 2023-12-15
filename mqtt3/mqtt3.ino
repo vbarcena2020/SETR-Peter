@@ -26,6 +26,9 @@
 const char* ssid = "eduroam"; // eduroam SSID
 volatile int state = 0;
 long time_init;
+#define RXD2 33
+#define TXD2 4
+String sendBuff;
 
 //-----
 WiFiClient wifiClient;
@@ -95,8 +98,9 @@ void set_ping_json() {
 
 //-----
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   delay(10);
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
   Serial.print(F("Connecting to network: "));
   Serial.println(ssid);
   WiFi.disconnect(true); 
@@ -158,10 +162,34 @@ void loop() {
 
       Serial.println();
       time_init = millis();
+      delay(5000);
+      //Serial2.println('a');
+      Serial2.println("a");
+      Serial.println("a");
+
       state = 1;
     }
   }
+  // if (state == 1) {
 
+
+  //   if (Serial2.available()) {
+
+  //     char c = Serial2.read();
+  //     sendBuff += c;
+      
+  //     if (c == 'GO!')  {            
+  //       Serial.print("Received data in serial port from Arduino: ");
+  //       Serial.println(sendBuff);
+
+  //       sendBuff = "";
+  //     } 
+
+
+  //   }
+
+    
+  // }
   if(state == 1) {
     
     if (currentMillis - previousMillis >= interval) {
@@ -179,7 +207,7 @@ void loop() {
 
       Serial.println();
       
-      state = 2;
+      state = 3;
 
     }
   }
