@@ -34,12 +34,13 @@
 #define PERIODIC_SENSE 70  //SENSE
 #define PERIODIC_DIST 90   //DIST
 
+int received = 0;
 
 CRGB leds[NUM_LEDS];
 
 volatile int ir_state = 1;
 volatile int last_ir_sense = 1;
-int stop = 0;
+int stop = 1;
 long dist;
 
 
@@ -72,6 +73,7 @@ void setup() {
   xTaskCreate(sense_line, "Sense_Line", 90, NULL, 2, NULL);
   xTaskCreate(movement, "Movement", 70, NULL, 3, NULL);
   xTaskCreate(sense_distance, "Sense_Distance", 90, NULL, 1, NULL);
+  xTaskCreate(comunication_esp, "Comunication_ESP", 90, NULL, 0, NULL);
 
 }
 
@@ -110,6 +112,7 @@ void turn_right(int speed, int turn_speed) {
 
 void movement(void *pvParameters) {
   TickType_t xLastWakeTime, aux;
+
 
 
   while (1) {
@@ -187,6 +190,47 @@ void sense_distance(void *pvParameters) {
   }
 }
 
+
+
+void comunication_esp(void *pvParameters) {
+  TickType_t xLastWakeTime, aux;
+
+
+  while (1) {
+    xLastWakeTime = xTaskGetTickCount();
+    aux = xLastWakeTime;
+
+    if (stop == 1) {
+      String s = Serial.readString();
+      Serial.print(s);
+      //if (Serial.available() > 0) {
+
+        //String c = Serial.readString();
+        //Serial .print(c);
+        
+        // if (c == "a")  {            
+
+        //   // Set Red Green to LED
+        //   stop = 0;
+        //   FastLED.showColor(Color(0, 0, 255));
+        //   break;
+        // } 
+
+      //}
+
+      if (s == 'a')  {            
+
+        // Set Red Green to LED
+        stop = 0;
+        FastLED.showColor(Color(0, 0, 255));
+        break;
+      } 
+
+    }
+     
+    xTaskDelayUntil( &xLastWakeTime, ( PERIODIC_DIST / portTICK_PERIOD_MS ) );
+  }
+}
 
 void sense_line(void *pvParameters) {
   TickType_t xLastWakeTime, aux;
