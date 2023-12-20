@@ -29,6 +29,20 @@ long time_init;
 #define RXD2 33
 #define TXD2 4
 #define START 0
+#define LOST "lost"
+#define PING "ping"
+#define DIST "dist"
+#define STOP "stop"
+#define INIT_STATE  0 
+#define FIRST_STATE  1
+#define FINAL_STATE  2
+#define ID 4
+#define NAME_GROUP "Nocom-Pila"
+#define START_LAP "START_LAP"
+#define END_LAP "END_LAP"
+#define PING_LAP "PING"
+#define OBSTACLE "OBSTACLE_DETECTED"
+#define LINE_LOST "LINE_LOST"
 String sendBuff;
 
 //-----
@@ -52,9 +66,9 @@ StaticJsonDocument<256> docPing;
 char out[128];
 
 void set_start_lap() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "START_LAP";
+  docStart["team_name"] = NAME_GROUP;
+  docStart["id"] = ID;
+  docStart["action"] = START_LAP;
 
   int b =serializeJson(docStart, out);
   Serial.print("bytes = ");
@@ -63,35 +77,35 @@ void set_start_lap() {
 
 
 void set_end_lap(String end_time ) {
-  docEnd["team_name"] = "Nocom-Pila";
-  docEnd["id"] = 4;
-  docEnd["action"] = "END_LAP";
-  docEnd["time"] = end_time;
+  docEnd["team_name"] = NAME_GROUP;
+  docEnd["id"] = ID;
+  docEnd["action"] = END_LAP;
+  docEnd["time"] = end_time.toInt();
 
   int b =serializeJson(docEnd, out);
 }
 
 void set_obs_json(String distance ) {
-  docObs["team_name"] = "Nocom-Pila";
-  docObs["id"] = 4;
-  docObs["action"] = "OBSTACLE_DETECTED";
-  docObs["distance"] = distance;
+  docObs["team_name"] = NAME_GROUP;
+  docObs["id"] = ID;
+  docObs["action"] = OBSTACLE;
+  docObs["distance"] = distance.toInt();
 
   int b =serializeJson(docObs , out);
 }
 
 void set_line_json() {
-  docLine["team_name"] = "Nocom-Pila";
-  docLine["id"] = 4;
-  docLine["action"] = "LINE_LOST";
+  docLine["team_name"] = NAME_GROUP;
+  docLine["id"] = ID;
+  docLine["action"] = LINE_LOST;
 
   int b =serializeJson(docLine, out);
 }
 void set_ping_json(String time) {
-  docPing["team_name"] = "Nocom-Pila";
-  docPing["id"] = 4;
-  docPing["action"] = "PING";
-  docPing["time"] = time ;
+  docPing["team_name"] = NAME_GROUP;
+  docPing["id"] = ID;
+  docPing["action"] = PING_LAP;
+  docPing["time"] = time.toInt() ;
 
   int b =serializeJson(docPing, out);
 }
@@ -140,82 +154,79 @@ void setup() {
 }
 
 void loop() {
-  //yield();
 
   mqttClient.poll();
   unsigned long currentMillis = millis();
-  if (state == 0) {
+  if (state == INIT_STATE) {
     
-
     if (currentMillis - previousMillis >= interval) {
-      // save the last time a message was sent
-      previousMillis = currentMillis;
+      previousMillis = currentMillis; // update times .
 
       Serial.print("Sending message to topic: ");
       Serial.println(topic);
       Serial.println(out);
 
-      // send message, the Print interface can be used to set the message contents
+      // send message.
+      delay(1000);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
 
-      Serial.println();
+      //Serial.println();
       time_init = millis();
-      delay(5000);
-      //Serial2.println('a');
-      
-      Serial2.println("start");
-      Serial.println("start");
 
-      state = 1;
+      Serial2.println("start");
+      //Serial.println("start");
+
+      state = FIRST_STATE;
     }
   }
-  if (state == 1) {
+  if (state == FIRST_STATE) {
 
     String s = Serial2.readString();
-    //String time = Serial2.readString();
 
-    int i = s.indexOf(' ');
+    //int i = s.indexOf(PING);
     int j = s.indexOf('\r');
-    String token = s.substring(0, i);
-    String parameter = s.substring(i+1, j);
+    //String token = s.substring(0, i);
     //Serial.println(token);
     //Serial.println(parameter);
     //Serial.println(s);
-  
-    if(token == "ping") {
-      
+    
+    if(s.indexOf(PING) != -1) {
+      String parameter = s.substring(s.indexOf(PING)+5, s.indexOf(PING)+10);
+
       set_ping_json(parameter);
-      //Serial.println(parameter);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
-    } else if(token == "lost") {
+    }
+    if(s.indexOf(LOST) != -1) {
+      String parameter = s.substring(s.indexOf(LOST)+5, j);
+
       set_line_json();
-      //Serial.println(parameter);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
-      
-    } else if(token == "dist") {
-      
-      set_obs_json(parameter);
-      //Serial.println(parameter);
-      mqttClient.beginMessage(topic);
-      mqttClient.print(out);
-      mqttClient.endMessage();
-      
-    }  else if (token == "stop") {
-      set_end_lap(parameter);
-      //Serial.println(parameter);
-      mqttClient.beginMessage(topic);
-      mqttClient.print(out);
-      mqttClient.endMessage();
-      state = 2;
       
     }
-    
-  }
+    if(s.indexOf(DIST) != -1) {
+      String parameter = s.substring(s.indexOf(DIST)+5, s.indexOf(DIST)+8);
+      
+      set_obs_json(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(STOP) != -1) {
+      String parameter = s.substring(s.indexOf(STOP)+5, s.indexOf(STOP)+10);
 
+      set_end_lap(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      state = FINAL_STATE;
+      
+    }
+  }
 }
