@@ -28,6 +28,27 @@ volatile int state = 0;
 long time_init;
 #define RXD2 33
 #define TXD2 4
+#define START 0
+#define LOST "lost"
+#define PING "ping"
+#define DIST "dist"
+#define STOP "stop"
+#define FIND "find"
+#define INIT "init"
+#define CLOSE "close"
+#define INIT_STATE  0 
+#define FIRST_STATE  1
+#define FINAL_STATE  2
+#define ID 4
+#define NAME_GROUP "Nocom-Pila"
+#define START_LAP "START_LAP"
+#define END_LAP "END_LAP"
+#define PING_LAP "PING"
+#define OBSTACLE "OBSTACLE_DETECTED"
+#define LINE_LOST "LINE_LOST"
+#define LINE_FOUNDED "LINE_FOUND"
+#define INIT_LINE_FIND  "INIT_LINE_SEARCH"
+#define STOP_LINE_FIND "STOP_LINE_SEARCH"
 String sendBuff;
 
 //-----
@@ -38,8 +59,6 @@ MqttClient mqttClient(wifiClient);
 const char broker[] = "193.147.53.2";
 int        port     = 21883;
 const char topic[]  = "/SETR/2023/4/";
-
-
 const long interval = 5000;
 unsigned long previousMillis = 0;
 
@@ -50,48 +69,81 @@ StaticJsonDocument<256> docEnd;
 StaticJsonDocument<256> docObs;
 StaticJsonDocument<256> docLine;
 StaticJsonDocument<256> docPing;
+StaticJsonDocument<256> docFound;
+StaticJsonDocument<256> docInitFound;
+StaticJsonDocument<256> docStopFound;
 char out[128];
 
 void set_start_lap() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "START_LAP";
+  docStart["team_name"] = NAME_GROUP;
+  docStart["id"] = ID;
+  docStart["action"] = START_LAP;
 
   int b =serializeJson(docStart, out);
   Serial.print("bytes = ");
   Serial.println(b,DEC);
 }
 
+//
+void set_found_lap() {
+  docFound["team_name"] = NAME_GROUP;
+  docFound["id"] = ID;
+  docFound["action"] = LINE_FOUNDED;
 
-void set_end_lap(long end_time ) {
-  docEnd["team_name"] = "Nocom-Pila";
-  docEnd["id"] = 4;
-  docEnd["action"] = "END_LAP";
-  docEnd["time"] = end_time;
+  int b =serializeJson(docFound, out);
+
+}
+
+void set_init_lap() {
+  docInitFound["team_name"] = NAME_GROUP;
+  docInitFound["id"] = ID;
+  docInitFound["action"] = INIT_LINE_FIND;
+
+  int b =serializeJson(docInitFound, out);
+
+}
+void set_stop_found_lap() {
+  docStopFound["team_name"] = NAME_GROUP;
+  docStopFound["id"] = ID;
+  docStopFound["action"] = STOP_LINE_FIND;
+
+  int b =serializeJson(docStopFound, out);
+
+}
+
+//
+
+
+void set_end_lap(String end_time ) {
+  docEnd["team_name"] = NAME_GROUP;
+  docEnd["id"] = ID;
+  docEnd["action"] = END_LAP;
+  docEnd["time"] = end_time.toInt();
 
   int b =serializeJson(docEnd, out);
 }
 
-void set_obs_json(int distance ) {
-  docEnd["team_name"] = "Nocom-Pila";
-  docEnd["id"] = 4;
-  docEnd["action"] = "OBSTACLE_DETECTED";
-  docEnd["distance"] = distance;
+void set_obs_json(String distance ) {
+  docObs["team_name"] = NAME_GROUP;
+  docObs["id"] = ID;
+  docObs["action"] = OBSTACLE;
+  docObs["distance"] = distance.toInt();
 
   int b =serializeJson(docObs , out);
 }
 
 void set_line_json() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "LINE_LOST";
+  docLine["team_name"] = NAME_GROUP;
+  docLine["id"] = ID;
+  docLine["action"] = LINE_LOST;
 
   int b =serializeJson(docLine, out);
 }
-void set_ping_json() {
-  docStart["team_name"] = "Nocom-Pila";
-  docStart["id"] = 4;
-  docStart["action"] = "PING";
+void set_ping_json(String time) {
+  docPing["team_name"] = NAME_GROUP;
+  docPing["id"] = ID;
+  docPing["action"] = PING_LAP;
+  docPing["time"] = time.toInt() ;
 
   int b =serializeJson(docPing, out);
 }
@@ -140,75 +192,108 @@ void setup() {
 }
 
 void loop() {
-  //yield();
 
   mqttClient.poll();
   unsigned long currentMillis = millis();
-  if (state == 0) {
+  if (state == INIT_STATE) {
     
-
     if (currentMillis - previousMillis >= interval) {
-      // save the last time a message was sent
-      previousMillis = currentMillis;
+      previousMillis = currentMillis; // update times .
 
       Serial.print("Sending message to topic: ");
       Serial.println(topic);
       Serial.println(out);
 
-      // send message, the Print interface can be used to set the message contents
+      // send message.
+      delay(1000);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
 
-      Serial.println();
+      //Serial.println();
       time_init = millis();
-      delay(5000);
-      //Serial2.println('a');
-      Serial2.println("a");
-      Serial.println("a");
 
-      state = 1;
+      Serial2.println("start");
+      //Serial.println("start");
+
+      state = FIRST_STATE;
     }
   }
-  // if (state == 1) {
+  if (state == FIRST_STATE) {
 
+    String s = Serial2.readString();
 
-  //   if (Serial2.available()) {
-
-  //     char c = Serial2.read();
-  //     sendBuff += c;
-      
-  //     if (c == 'GO!')  {            
-  //       Serial.print("Received data in serial port from Arduino: ");
-  //       Serial.println(sendBuff);
-
-  //       sendBuff = "";
-  //     } 
-
-
-  //   }
-
+    //int i = s.indexOf(PING);
+    int j = s.indexOf('\r');
+    //String token = s.substring(0, i);
+    //Serial.println(token);
+    //Serial.println(parameter);
+    //Serial.println(s);
     
-  // }
-  if(state == 1) {
-    
-    if (currentMillis - previousMillis >= interval) {
+    if(s.indexOf(PING) != -1) {
+      String parameter = s.substring(s.indexOf(PING)+5, s.indexOf(PING)+10);
 
-      set_end_lap(millis() - time_init);
-
-      Serial.print("Sending message to topic: ");
-      Serial.println(topic);
-      Serial.println(out);
-
-      // send message, the Print interface can be used to set the message contents
+      set_ping_json(parameter);
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
-
-      Serial.println();
-      
-      state = 3;
-
     }
+    if(s.indexOf(LOST) != -1) {
+      //String parameter = s.substring(s.indexOf(LOST)+5, j);
+
+      set_line_json();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(INIT) != -1) {
+      //String parameter = s.substring(s.indexOf(INIT)+5, s.indexOf(INIT)+10);
+
+      set_init_lap();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(CLOSE) != -1) {
+      //String parameter = s.substring(s.indexOf(CLOSE)+5, s.indexOf(CLOSE)+10);
+
+      set_stop_found_lap();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+     if (s.indexOf(FIND) != -1) {
+      //String parameter = s.substring(s.indexOf(CLOSE)+5, s.indexOf(CLOSE)+10);
+
+      set_found_lap();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if(s.indexOf(DIST) != -1) {
+      String parameter = s.substring(s.indexOf(DIST)+5, s.indexOf(DIST)+8);
+      
+      set_obs_json(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(STOP) != -1) {
+      String parameter = s.substring(s.indexOf(STOP)+5, s.indexOf(STOP)+10);
+
+      set_end_lap(parameter);
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      state = FINAL_STATE;
+      
+    }
+
+    
   }
 }

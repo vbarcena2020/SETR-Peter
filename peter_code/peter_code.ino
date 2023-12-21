@@ -33,6 +33,7 @@
 #define PERIODIC_MOVE 90   //MOVE
 #define PERIODIC_SENSE 70  //SENSE
 #define PERIODIC_DIST 90   //DIST
+#define START 0
 
 int received = 0;
 
@@ -201,8 +202,8 @@ void comunication_esp(void *pvParameters) {
     aux = xLastWakeTime;
 
     if (stop == 1) {
-      String s = Serial.readString();
-      Serial.print(s);
+      char s = Serial.read();
+      //Serial.print(s);
       //if (Serial.available() > 0) {
 
         //String c = Serial.readString();
@@ -217,8 +218,9 @@ void comunication_esp(void *pvParameters) {
         // } 
 
       //}
-
-      if (s == 'a')  {            
+      int n = atoi(s);
+      Serial.print(n);
+      if (n == 1)  {            
 
         // Set Red Green to LED
         stop = 0;
