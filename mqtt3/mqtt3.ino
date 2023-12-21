@@ -2,7 +2,7 @@
 /*|Connection sketch to eduroam network (WPA/WPA2) Enteprise |*/
 /*|Suitable for almost any ESP32 microcontroller with WiFi   |*/
 /*|Raspberry or Arduino WiFi CAN'T USE THIS LIBRARY!!!       |*/
-/*|Edited by: Martin Chlebovec (martinius96)                 |*/
+/*|Edited by: Nocom-Pila (abito2 and keist)                  |*/
 /*|Compilation under 2.0.3 Arduino Core and higher worked    |*/
 /*|Compilation can be done only using STABLE releases        |*/
 /*|Dev releases WILL NOT WORK. (Check your Ard. Core .json)  |*/
