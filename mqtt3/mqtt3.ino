@@ -33,6 +33,9 @@ long time_init;
 #define PING "ping"
 #define DIST "dist"
 #define STOP "stop"
+#define FIND "find"
+#define INIT "init"
+#define CLOSE "close"
 #define INIT_STATE  0 
 #define FIRST_STATE  1
 #define FINAL_STATE  2
@@ -43,6 +46,9 @@ long time_init;
 #define PING_LAP "PING"
 #define OBSTACLE "OBSTACLE_DETECTED"
 #define LINE_LOST "LINE_LOST"
+#define LINE_FOUNDED "LINE_FOUND"
+#define INIT_LINE_FIND  "INIT_LINE_SEARCH"
+#define STOP_LINE_FIND "STOP_LINE_SEARCH"
 String sendBuff;
 
 //-----
@@ -63,6 +69,9 @@ StaticJsonDocument<256> docEnd;
 StaticJsonDocument<256> docObs;
 StaticJsonDocument<256> docLine;
 StaticJsonDocument<256> docPing;
+StaticJsonDocument<256> docFound;
+StaticJsonDocument<256> docInitFound;
+StaticJsonDocument<256> docStopFound;
 char out[128];
 
 void set_start_lap() {
@@ -74,6 +83,35 @@ void set_start_lap() {
   Serial.print("bytes = ");
   Serial.println(b,DEC);
 }
+
+//
+void set_found_lap() {
+  docFound["team_name"] = NAME_GROUP;
+  docFound["id"] = ID;
+  docFound["action"] = LINE_FOUNDED;
+
+  int b =serializeJson(docFound, out);
+
+}
+
+void set_init_lap() {
+  docInitFound["team_name"] = NAME_GROUP;
+  docInitFound["id"] = ID;
+  docInitFound["action"] = INIT_LINE_FIND;
+
+  int b =serializeJson(docInitFound, out);
+
+}
+void set_stop_found_lap() {
+  docStopFound["team_name"] = NAME_GROUP;
+  docStopFound["id"] = ID;
+  docStopFound["action"] = STOP_LINE_FIND;
+
+  int b =serializeJson(docStopFound, out);
+
+}
+
+//
 
 
 void set_end_lap(String end_time ) {
@@ -201,9 +239,36 @@ void loop() {
       mqttClient.endMessage();
     }
     if(s.indexOf(LOST) != -1) {
-      String parameter = s.substring(s.indexOf(LOST)+5, j);
+      //String parameter = s.substring(s.indexOf(LOST)+5, j);
 
       set_line_json();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(INIT) != -1) {
+      //String parameter = s.substring(s.indexOf(INIT)+5, s.indexOf(INIT)+10);
+
+      set_init_lap();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+    if (s.indexOf(CLOSE) != -1) {
+      //String parameter = s.substring(s.indexOf(CLOSE)+5, s.indexOf(CLOSE)+10);
+
+      set_stop_found_lap();
+      mqttClient.beginMessage(topic);
+      mqttClient.print(out);
+      mqttClient.endMessage();
+      
+    }
+     if (s.indexOf(FIND) != -1) {
+      //String parameter = s.substring(s.indexOf(CLOSE)+5, s.indexOf(CLOSE)+10);
+
+      set_found_lap();
       mqttClient.beginMessage(topic);
       mqttClient.print(out);
       mqttClient.endMessage();
@@ -228,5 +293,7 @@ void loop() {
       state = FINAL_STATE;
       
     }
+
+    
   }
 }
